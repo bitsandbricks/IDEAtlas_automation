@@ -8,6 +8,9 @@
 /test_fixtures/*.tif
 /test_fixtures/*.gpkg
 
+# ---- Reference documents (kept locally, not versioned) ----
+/handbook/
+
 # ---- The ai-dua-mapping framework is a pinned external clone ----
 # It is not tracked here; it is brought in with `git clone`
 # and pinned to the commit recorded in README.md (see make setup).
