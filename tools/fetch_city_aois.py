@@ -27,9 +27,13 @@ import json
 import os
 import sys
 import time
+from pathlib import Path
 from typing import Dict, List, Optional
 
 import requests
+
+# Make `import pipeline.*` work when this script runs directly (as `make aois`).
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 USER_AGENT = "ideatlas-automation/0.1 (reproducible SDG 11.1.1 mapping)"
