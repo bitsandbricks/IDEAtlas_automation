@@ -46,8 +46,9 @@ MAX_AREA_KM2 = 10000.0
 # skipped with a warning (then provide the AOI file manually).
 CITY_QUERIES: Dict[str, List[str]] = {
     "asuncion": [
-        "Asuncion, Distrito Capital, Paraguay",
+        "Distrito Capital, Paraguay",
         "Asuncion, Paraguay",
+        "Asuncion",
     ],
     "encarnacion": [
         "Encarnacion, Itapua, Paraguay",
@@ -60,17 +61,28 @@ CITY_QUERIES: Dict[str, List[str]] = {
 }
 
 
-def _area_km2(geometry: dict) -> float:
-    """Approximate polygon area in km2 from lon/lat coordinates."""
+def _area_km2(geometry: dict) -> Optional[float]:
+    """Approximate polygon area in km2 from lon/lat coordinates.
+
+    Returns ``None`` when the area cannot be computed (e.g. shapely missing);
+    callers treat that as "plausible" (never reject on unknown area).
+    """
     try:
         from shapely.geometry import shape
-    except ImportError:  # pragma: no cover - shapely ships with the env
-        return -1.0  # unknown area; treated as plausible
+    except ImportError:
+        return None
 
     geom = shape(geometry)
     if geom.is_empty or geom.area == 0:
         return 0.0
     return geom.area * (111.32 ** 2)  # rough degrees^2 -> km^2
+
+
+def _plausible(geometry: dict) -> bool:
+    area = _area_km2(geometry)
+    if area is None:
+        return True  # unknown area; do not reject on that alone
+    return MIN_AREA_KM2 <= area <= MAX_AREA_KM2
 
 
 def _plausible(geometry: dict) -> bool:
@@ -96,12 +108,44 @@ def _nominatim_query(session: requests.Session, query: str, sleep: float) -> Lis
     return response.json()
 
 
+def _bbox_geometry(result: dict) -> Optional[dict]:
+    """Build a WGS84 rectangle Polygon from a Nominatim result's boundingbox.
+
+    Nominatim frequently returns capital cities as Points (their centre node);
+    the ``boundingbox`` is the only area clue. Returns ``None`` when no usable
+    bounding box is present.
+    """
+    bbox = result.get("boundingbox") or []
+    if len(bbox) != 4:
+        return None
+    south, north, west, east = (float(value) for value in bbox)
+    if not (south < north and west < east):
+        return None
+    return {
+        "type": "Polygon",
+        "coordinates": [[
+            [west, south],
+            [east, south],
+            [east, north],
+            [west, north],
+            [west, south],
+        ]],
+    }
+
+
 def fetch_aoi_geometry(
     session: requests.Session,
     queries: List[str],
     sleep: float = 1.2,
 ) -> Optional[dict]:
-    """Return the GeoJSON geometry for the first plausible polygon found."""
+    """Return the GeoJSON geometry for the first plausible polygon found.
+
+    When a query only returns Points (typical for capitals), the rectangle
+    built from the first result's ``boundingbox`` is remembered and used as a
+    last resort so the pipeline can still proceed; such AOIs should still be
+    verified in a GIS viewer.
+    """
+    fallbacks: List[tuple[str, dict]] = []
     for index, query in enumerate(queries):
         print(f"  query[{index}]: {query}")
         try:
@@ -114,6 +158,13 @@ def fetch_aoi_geometry(
             res for res in results
             if res.get("geojson", {}).get("type") in ("Polygon", "MultiPolygon")
         ]
+        if not polygons and not fallbacks:
+            for res in results:
+                if res.get("geojson", {}).get("type") == "Point" and res.get("boundingbox"):
+                    rectangle = _bbox_geometry(res)
+                    if rectangle is not None:
+                        fallbacks.append((res.get("display_name", "?"), rectangle))
+                        break
         if not polygons:
             print("    no polygon result from Nominatim")
             continue
@@ -126,6 +177,15 @@ def fetch_aoi_geometry(
                 return geometry
             print(f"    rejected (implausible area): {name}")
 
+    if fallbacks:
+        name, geometry = fallbacks[0]
+        print(f"    using rectangular fallback from boundingbox of: {name}")
+        print("    WARNING: verify this AOI in a GIS viewer before running the pipeline.")
+        if _plausible(geometry):
+            return geometry
+        print(f"    rejected (implausible area): {name}")
+
+    print("    no polygon result from Nominatim")
     return None
 
 

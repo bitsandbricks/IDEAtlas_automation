@@ -82,6 +82,14 @@ Notes on the matching logic:
 
 - Plausibility filter: the polygon must have an area between 1 km² and
   10,000 km²; implausible candidates are rejected and the next query is tried.
+- **Capitals often come back as Points.** Nominatim ranks a capital's centre
+  *node* above its boundary *relation*, so queries like `"Asuncion, Paraguay"`
+  yield a `Point`, not a polygon. When that happens: reword the query to hit
+  the administrative boundary instead — e.g. for Asunción the working query is
+  `"Distrito Capital, Paraguay"`. As a last resort the tool falls back to a
+  rectangle built from Nominatim's bounding box (logged as
+  `using rectangular fallback ...`) — **verify such AOIs in a GIS viewer**
+  before running the pipeline.
 - Nominatim is rate-limited: the tool sleeps (`--sleep`, default 1.2 s) and
   sends a custom User-Agent. Be gentle on repeat runs.
 - A city key with **no queries** is skipped with a
@@ -311,6 +319,10 @@ find them.
   [§5](#5-fine-tuning-or-training-a-local-model)).
 - **AOI looks wrong** → verify in QGIS *before* `make city`; a bad polygon
   means wasted downloads.
+- **Capital returned as a Point / "no polygon result"** → rewrite the query to
+  target the administrative boundary (see [§2](#2-make-the-boundary-resolvable))
+  or provide the AOI manually; a rectangular `boundingbox` fallback is used
+  only as a last resort and must be verified.
 - **Rate-limited by Nominatim** → increase the inter-request delay
   (`tools/fetch_city_aois.py --sleep`).
 - **`WARNING: no curated queries defined`** → add your queries or supply the
