@@ -11,6 +11,9 @@ YAML file into `config/cities/`:
 - **Encarnación** (`encarnacion`)
 - **Ciudad del Este** (`ciudad-del-este`)
 
+New user? Adding a city of your own is a five-minute task — see
+[docs/adding-a-city.md](docs/adding-a-city.md).
+
 This repository does **not** re-implement the mapping model. It wraps the
 real IDEAtlas framework (`ai-dua-mapping`, cloned into `ai-dua-mapping/` and
 left untouched) with a thin automation layer that:
