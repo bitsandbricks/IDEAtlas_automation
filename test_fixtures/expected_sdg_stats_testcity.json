@@ -1,0 +1,35 @@
+{
+  "city": "testcity",
+  "country": "testland",
+  "year": 2025,
+  "model": "mbcnn",
+  "task_requested": "classify",
+  "task_effective": "classify",
+  "fallback_reason": null,
+  "reference_data_found": false,
+  "generated_at": "2026-09-23T18:59:29+00:00",
+  "classified_raster": "testcity_testland.s2.bd.mbcnn.2025.tif",
+  "totals": {
+    "built_up_area_ha": 1378.91236,
+    "built_up_area_km2": 13.789124,
+    "built_up_population": 94320.994356
+  },
+  "summary": {
+    "formal": {
+      "area_m2": 9774457.247212,
+      "pop": 73199.253031,
+      "area_ha": 977.445725,
+      "area_sqkm": 9.774457,
+      "area_pct": 70.885268,
+      "pop_pct": 77.606532
+    },
+    "informal": {
+      "area_m2": 4014666.353682,
+      "pop": 21121.741325,
+      "area_ha": 401.466635,
+      "area_sqkm": 4.014666,
+      "area_pct": 29.114732,
+      "pop_pct": 22.393468
+    }
+  }
+}

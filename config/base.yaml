@@ -1,0 +1,36 @@
+# Base configuration for the IDEAtlas automation layer.
+#
+# This file is merged with a per-city file in config/cities/ before any
+# pipeline step runs. City-specific settings (e.g. the country) can
+# override values defined here. All paths are relative to the repository
+# root unless noted otherwise.
+#
+# This configuration is ONLY used by the automation layer itself. The
+# ai-dua-mapping framework has its own config.yaml (model hyper-parameters,
+# paths) which we leave untouched.
+
+# Global seed. The framework also seeds TensorFlow/numpy/random from its own
+# config.yaml (default 42); this seed is kept explicit so the choice is
+# documented and does not depend on a silent default.
+seed: 42
+
+# Directory where the ai-dua-mapping framework is cloned.
+ai_dua_mapping_dir: ai-dua-mapping
+
+# Where logs written by the automation components go.
+log_dir: log
+
+# Where consolidated outputs go (per-city sdg_stats.json, markdown/xlsx reports).
+outputs_dir: outputs
+
+# Where transient state goes (decision files and completion markers).
+state_dir: data/processed
+
+# Model architecture handed to ai-dua-mapping. mbcnn is the framework default.
+model: mbcnn
+
+# Retry policy used when invoking ai-dua-mapping's main.py.
+# max_attempts counts the first attempt (e.g. 3 == 1 attempt + 2 retries).
+retry:
+  max_attempts: 3
+  backoff_seconds: 30

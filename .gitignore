@@ -1,0 +1,26 @@
+# ---- Generated runtime data (never versioned) ----
+/data/
+/log/
+/outputs/
+
+# ---- Bulky test-fixture samples (regenerable via `make fixtures`) ----
+# Small samples (aoi, reference, expected JSON, docs) remain tracked.
+/test_fixtures/*.tif
+/test_fixtures/*.gpkg
+
+# ---- The ai-dua-mapping framework is a pinned external clone ----
+# It is not tracked here; it is brought in with `git clone`
+# and pinned to the commit recorded in README.md (see make setup).
+/ai-dua-mapping/
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# ---- Editors / OS ----
+.DS_Store
+*.swp

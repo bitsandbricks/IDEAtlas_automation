@@ -1,0 +1,12 @@
+# Dependencies of the automation layer itself.
+#
+# The heavy geospatial/ML environment (TensorFlow, geopandas, rasterio, GDAL,
+# ...) is managed separately through ai-dua-mapping/environment.yaml with
+# conda (see `make setup`). This file only lists the small extra packages the
+# automation components need on top of that environment.
+
+PyYAML>=6.0
+openpyxl>=3.0
+
+# Development / testing
+pytest>=7.0
