@@ -106,7 +106,7 @@ def test_finetune_chain_testcity_ref(tmp_path):
     reference = (
         FRAMEWORK_DIR
         / "data" / "raw" / "reference_data"
-        / "testcity_ref_testland_reference_2025.geojson"
+        / "testcity_ref_testland_reference_2025_v1.geojson"
     )
     if not reference.exists():
         pytest.skip("testcity-ref reference fixtures not generated (run 'make fixtures')")

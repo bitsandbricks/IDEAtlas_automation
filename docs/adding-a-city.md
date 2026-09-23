@@ -10,7 +10,7 @@ one **optional** file:
 |---|---|---|
 | `config/cities/<city>.yaml` | required | Who/where: `country`, `year` |
 | `CITY_QUERIES` entry in `tools/fetch_city_aois.py` | recommended | How to find the city boundary (Nominatim queries) |
-| `ai-dua-mapping/data/raw/reference_data/<city>_<country>_reference_<year>.geojson` | only for `finetune`/`train` | Labeled "deprived urban area" polygons for training |
+| `ai-dua-mapping/data/raw/reference_data/<city>_<country>_reference_<year>_v<n>.geojson` | only for `finetune`/`train` | Labeled "deprived urban area" polygons for training (version suffix required — see [§5](#5-fine-tuning-or-training-a-local-model)) |
 
 Everything else (file names, downloads, the report) is derived automatically
 from the city key and country — you never touch the `ai-dua-mapping`
@@ -165,21 +165,88 @@ backoff) before the pipeline stops.
 
 ## 5. Fine-tuning or training a local model
 
-Optional. Only needed when you have **your own labeled reference data**
-(polygons marking "deprived urban areas") and want a model tuned to your city.
+Optional. Only needed when you have **your own labeled reference data** —
+polygons marking "deprived urban areas" (DUAs) in your city — and want a model
+tuned to it.
 
-Place the reference file in `ai-dua-mapping/data/raw/reference_data/`:
+### The reference file you provide
+
+Drop a GeoJSON into `ai-dua-mapping/data/raw/reference_data/`, named with a
+**version suffix**:
 
 ```
-<city>_<country>_reference_<year>.geojson
-# e.g. rio_de_janeiro_brazil_reference_2020.geojson
+<city>_<country>_reference_<year>_v1.geojson
+# e.g. rio_de_janeiro_brazil_reference_2020_v1.geojson
 ```
 
-Variants accepted by the framework: `.tif` rasters, and version suffixes
-(`..._reference_2020_v1.geojson`, `_v2`, ...).
+> **Version suffix is required.** The framework parses the version from
+> everything after the last `_v` in the file name (`prepare_data.py`). A name
+> **without** `_vN` (e.g. `..._reference_2020.geojson`) makes that parser build
+> a broken output path. Always use `_vN`, and bump `N` when you update the
+> polygons.
 
-Then run `make city CITY=<city> TASK=finetune`. The pipeline detects the
-reference data, trains a city model, and saves it to
+Expected format (read by geopandas, `preprocessing/create_ref.py`):
+
+| Property | Requirement |
+|---|---|
+| File | GeoJSON (`FeatureCollection`) |
+| Geometry | `Polygon` / `MultiPolygon` features |
+| Attributes | **None required** — every feature becomes a DUA. There is no class/label column; the layer assigns class 2 to all of them. |
+| CRS | Must be declared, e.g. WGS84 (`EPSG:4326`) as in the sample below. Auto-reprojected to the Sentinel-2 raster CRS if different. |
+| Content | At least one polygon. An empty feature set silently yields an all-"built-up" mask (no DUAs) — a useless model. |
+| Placement | Local deprived blocks inside/near your AOI, **not** the whole city polygon. |
+
+A minimal working sample (the exact shape the test fixtures use):
+
+```json
+{
+  "type": "FeatureCollection",
+  "name": "dua_reference",
+  "crs": {"type": "name", "properties": {"name": "urn:ogc:def:crs:OGC:1.3:CRS84"}},
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {},
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [-56.4520, -25.4520],
+          [-56.4280, -25.4520],
+          [-56.4280, -25.4280],
+          [-56.4520, -25.4280],
+          [-56.4520, -25.4520]
+        ]]
+      }
+    }
+  ]
+}
+```
+
+### What the pipeline does with it
+
+`prepare_data.py` rasterizes your polygons into a 3-class label mask aligned
+to the Sentinel-2 grid (same CRS, resolution, extent) and saves it as
+`<city>_<country>_reference_<year>_v<version>.tif`:
+
+- `0` — non built-up;
+- `1` — built-up (auto-derived: GHSL built-up fraction > 15);
+- `2` — your DUAs.
+
+The mask is then divided into training tiles (`..._v<version>_clipped.tif`)
+and paired with the matching Sentinel-2 and building-density patches.
+
+**Alternative — provide the mask directly:** if a file matching
+`<city>_<country>_reference_<year>_v*.tif` already exists, `prepare_data.py`
+reuses it and skips polygon processing (`prepare_data.py`, step 4). You can
+pre-build such a mask yourself (uint8, values 0/1/2, on the Sentinel-2 grid).
+
+Then run:
+
+```bash
+make city CITY=<city> TASK=finetune
+```
+
+The pipeline detects the reference data, trains a city model, and saves it to
 `ai-dua-mapping/checkpoint/<city>_<country>.s2.bd.mbcnn.weights.h5`, then
 classifies with it automatically. Without reference data the `finetune`
 request falls back to `classify`.
@@ -214,7 +281,7 @@ hyphens → underscores). The layer and the framework agree on every path:
 | Building footprints | `ai-dua-mapping/data/raw/buildings/<city>_<country>_bldg.gpkg` |
 | Building density | `ai-dua-mapping/data/raw/buildings/density/<city>_<country>_bd.tif` |
 | GHSL rasters | `ai-dua-mapping/data/raw/ghsl/built|pop/<PREFIX>_*.tif` |
-| Reference data (finetune/train) | `ai-dua-mapping/data/raw/reference_data/<city>_<country>_reference_<year>.geojson` |
+| Reference data (finetune/train) | `ai-dua-mapping/data/raw/reference_data/<city>_<country>_reference_<year>_v<n>.geojson` (or a pre-built `..._v<n>.tif` mask) |
 | Classified raster | `ai-dua-mapping/output/<city>_<country>.s2.bd.<model>.<year>.tif` |
 | City model weights | `ai-dua-mapping/checkpoint/<city>_<country>.s2.bd.<model>.weights.h5` |
 | SDG 11.1.1 statistics | `outputs/<city>_<year>_sdg_stats.json` |
@@ -239,6 +306,9 @@ find them.
   with instructions to provide
   `data/raw/aoi/<city>_<country>_aoi.geojson` in WGS84 (see
   [step 2](#2-make-the-boundary-resolvable)).
+- **Reference file without `_vN` suffix** → the framework builds a broken
+  output path. Always name it `..._reference_<year>_v1.geojson` (see
+  [§5](#5-fine-tuning-or-training-a-local-model)).
 - **AOI looks wrong** → verify in QGIS *before* `make city`; a bad polygon
   means wasted downloads.
 - **Rate-limited by Nominatim** → increase the inter-request delay
@@ -255,8 +325,9 @@ find them.
 - [ ] Either queries added to `CITY_QUERIES` **or** a hand-written AOI file is
       in place.
 - [ ] `make aois` ran and the boundary opens correctly in a GIS viewer.
-- [ ] (finetune/train) reference polygons follow
-      `<city>_<country>_reference_<year>.geojson` in `reference_data/`.
+- [ ] (finetune/train) reference polygons named
+      `<city>_<country>_reference_<year>_v1.geojson` (version suffix required)
+      sit in `reference_data/`, with at least one polygon.
 - [ ] `make city CITY=<city>` completes and
       `outputs/<city>_<year>_sdg_stats.json` exists.
 - [ ] `make report` includes the new city sheet.

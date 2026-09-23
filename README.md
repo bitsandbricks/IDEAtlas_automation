@@ -198,15 +198,18 @@ Drop the file(s) into:
 ai-dua-mapping/data/raw/reference_data/
 ```
 
-Naming follows the framework's expectations:
+Naming follows the framework's expectations — a **version suffix is
+required** (the framework parses the version from after the last `_v`; a
+versionless name breaks its output path):
 
 ```
-<city>_<country>_reference_<year>.geojson
-# e.g. asuncion_paraguay_reference_2025.geojson
+<city>_<country>_reference_<year>_v1.geojson
+# e.g. asuncion_paraguay_reference_2025_v1.geojson
 ```
 
-…or with a version suffix (`..._reference_2025_v2.geojson`). Both `.geojson`
-and raster `.tif` reference files are supported.
+Bump `_vN` when you update the polygons. Both `.geojson` and raster `.tif`
+reference files are supported — see
+[docs/adding-a-city.md](docs/adding-a-city.md) §5 for the exact format.
 
 Then run:
 

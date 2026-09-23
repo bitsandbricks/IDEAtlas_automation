@@ -163,8 +163,12 @@ def build_density(city_norm: str, base: Path, s2: Path, buildings: Path, force: 
 
 
 def write_reference(city_norm: str, base: Path, year: int, force: bool) -> Path:
-    """Write a synthetic DUA-reference polygon for a test city."""
-    target = base / "reference_data" / f"{city_norm}_reference_{year}.geojson"
+    """Write a synthetic DUA-reference polygon for a test city.
+
+    The framework parses the version from the part after the last ``_v`` in
+    the file name, so the version suffix is mandatory (see docs/adding-a-city.md).
+    """
+    target = base / "reference_data" / f"{city_norm}_reference_{year}_v1.geojson"
     if target.exists() and not force:
         print(f"  SKIP reference: {target} exists")
         return target
@@ -293,7 +297,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         base / "sentinel" / ref_city / f"S2_{args.year}.tif",
         base / "buildings" / f"{ref_city}_bldg.gpkg",
         base / "buildings" / "density" / f"{ref_city}_bd.tif",
-        base / "reference_data" / f"{ref_city}_reference_{args.year}.geojson",
+        base / "reference_data" / f"{ref_city}_reference_{args.year}_v1.geojson",
     ]
     missing = [str(p) for p in required if not p.exists()]
     if missing:

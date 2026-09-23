@@ -27,9 +27,9 @@ It creates, under `ai-dua-mapping/data/raw/`:
 - `ghsl/built/TES_GHS_BUILT_*.tif`, `ghsl/pop/TES_GHS_POP_*.tif` — GHSL
   layers, shared by both test cities (the `TES` prefix comes from the first
   three letters of `testcity`);
-- `reference_data/testcity_ref_testland_reference_2025.geojson` — a synthetic
-  "deprived urban area" reference polygon used only by `testcity-ref` for
-  fine-tuning.
+- `reference_data/testcity_ref_testland_reference_2025_v1.geojson` — a
+  synthetic "deprived urban area" reference polygon used only by `testcity-ref`
+  for fine-tuning (the `_v1` version suffix is required by the framework).
 
 ## Sample copies stored here
 
