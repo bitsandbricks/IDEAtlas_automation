@@ -6,7 +6,7 @@ Documento de diseño para implementación con coding agent. Revisado de punta a 
 
 ## 1. Alcance
 
-Automatizar end-to-end el pipeline de IDEAtlas para tres ciudades de Paraguay, **reutilizando `ai-dua-mapping` como framework** (no reimplementando sus pasos internos), y agregando la capa de automatización que ese repo no provee: orquestación multi-ciudad, fallback automático de task, config por ciudad, logging estructurado, reintentos, y reporte consolidado.
+Automatizar end-to-end el pipeline de IDEAtlas para cualquier conjunto de ciudades (primera implementación: tres ciudades de Paraguay, usadas como ejemplos), **reutilizando `ai-dua-mapping` como framework** (no reimplementando sus pasos internos), y agregando la capa de automatización que ese repo no provee: orquestación multi-ciudad, fallback automático de task, config por ciudad, logging estructurado, reintentos, y reporte consolidado.
 
 ## 2. Principios de diseño
 

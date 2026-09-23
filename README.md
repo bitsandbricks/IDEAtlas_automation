@@ -1,9 +1,11 @@
-# IDEAtlas automation layer (Paraguay)
+# IDEAtlas automation layer
 
 Automated, reproducible pipeline for measuring the **proportion of the urban
 population living in deprived urban areas** (SDG indicator **11.1.1**) with
-the [IDEAtlas](https://github.com/IDEAtlas) methodology, applied to three
-Paraguayan cities:
+the [IDEAtlas](https://github.com/IDEAtlas) methodology, in any region. It
+ships with three **example cities** (from its first implementation in
+Paraguay, kept as a reference) and supports additional cities — just drop a
+YAML file into `config/cities/`:
 
 - **Asunción** (`asuncion`)
 - **Encarnación** (`encarnacion`)
@@ -219,7 +221,7 @@ classifies with it automatically.
 
 The AOI (Area Of Interest) is the city boundary used to download imagery. It
 is fetched once from OpenStreetMap (`make aois`) into
-`ai-dua-mapping/data/raw/aoi/<city>_paraguay_aoi.geojson`. If you prefer a
+`ai-dua-mapping/data/raw/aoi/<city>_<country>_aoi.geojson`. If you prefer a
 custom polygon (e.g. an official municipal boundary), replace that file with
 your own GeoJSON in WGS84 (EPSG:4326) — the pipeline will use it as-is.
 

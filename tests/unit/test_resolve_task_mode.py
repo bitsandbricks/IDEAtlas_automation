@@ -77,11 +77,18 @@ def test_write_json_atomic(tmp_path):
         assert json.load(fh) == {"a": 1}
 
 
-def test_main_writes_decision(tmp_path):
-    from pipeline.resolve_task_mode import main
+def test_main_writes_decision(tmp_path, monkeypatch):
+    from pipeline import resolve_task_mode as rtm
+
+    def fake_load_config(city, **kwargs):
+        cfg = load_config(city, **kwargs)
+        cfg.reference_dir = str(tmp_path)
+        return cfg
+
+    monkeypatch.setattr(rtm, "load_config", fake_load_config)
 
     out = tmp_path / "task_mode.json"
-    rc = main(["--city", "testcity-ref", "--task", "finetune", "--out", str(out)])
+    rc = rtm.main(["--city", "testcity-ref", "--task", "finetune", "--out", str(out)])
     assert rc == 0
     with open(out, encoding="utf-8") as fh:
         payload = json.load(fh)

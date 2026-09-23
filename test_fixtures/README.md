@@ -9,7 +9,8 @@ inputs are understandable and reviewable.
 
 `tools/fetch_test_fixtures.py` generates everything by calling the **real**
 ai-dua-mapping download functions on a small real area (a ~6.6 x 6.6 km
-square near Coronel Oviedo, Paraguay). Run it once inside the `ideatlas`
+square near Coronel Oviedo, Paraguay — the default example area, changeable
+with `--bbox`). Run it once inside the `ideatlas`
 environment:
 
     conda activate ideatlas

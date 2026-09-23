@@ -13,7 +13,7 @@
 # Typical usage after `conda activate ideatlas`:
 #
 #   make city CITY=asuncion                 # one city, default classify
-#   make all-cities YEAR=2025               # the three Paraguay cities
+#   make all-cities YEAR=2025               # the example cities
 #   make report                             # consolidated markdown + xlsx
 #   make help                               # this overview
 # ============================================================================
@@ -35,7 +35,8 @@ MAIN_DONE_MARKER = data/processed/$(CITY)_$(YEAR)/.main_done
 # Per-city SDG 11.1.1 statistics document:
 SDG_STATS_FILE = outputs/$(CITY)_$(YEAR)_sdg_stats.json
 
-# The three Paraguay cities this project targets.
+# Default example cities from the first implementation (Paraguay), kept as a
+# reference: replace with "<city>:<country>" pairs for your own region.
 CITIES = asuncion:paraguay encarnacion:paraguay ciudad-del-este:paraguay
 
 .PHONY: help
@@ -48,8 +49,8 @@ help:
 	@echo "  make setup        Create the 'ideatlas' conda environment and install"
 	@echo "                    the thin-layer dependencies (run once)."
 	@echo ""
-	@echo "  make aois         Fetch city boundaries (AOIs) for the Paraguay cities"
-	@echo "                    from OpenStreetMap/Nominatim."
+	@echo "  make aois         Fetch city boundaries (AOIs) for the cities in"
+	@echo "                    config/cities/ from OpenStreetMap/Nominatim."
 	@echo ""
 	@echo "  make fixtures     Generate the synthetic test-city (testcity) input data"
 	@echo "                    using the real framework download functions."
@@ -88,7 +89,7 @@ $(SDG_STATS_FILE): $(MAIN_DONE_MARKER)
 .PHONY: city
 city: $(SDG_STATS_FILE)
 
-# --- All Paraguay cities -------------------------------------------------------
+# --- All example cities -------------------------------------------------------
 
 .PHONY: all-cities all-cities-serial all-cities-parallel
 

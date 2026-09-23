@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "ideatlas-automation"
 version = "0.1.0"
-description = "Automation layer around the IDEAtlas ai-dua-mapping framework (Paraguay)."
+description = "Automation layer around the IDEAtlas ai-dua-mapping framework (SDG 11.1.1)."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch city boundaries (AOIs) for the Paraguay project cities from OSM.
+"""Fetch city boundaries (AOIs) for the project cities from OSM.
 
 Why this tool exists
 --------------------
@@ -37,6 +37,9 @@ MIN_AREA_KM2 = 1.0
 MAX_AREA_KM2 = 10000.0
 
 # Curated queries: try them in order until a plausible polygon is returned.
+# The entries below are the example cities from the first implementation
+# (Paraguay); add your own cities/regions here. Unknown city names are
+# skipped with a warning (then provide the AOI file manually).
 CITY_QUERIES: Dict[str, List[str]] = {
     "asuncion": [
         "Asuncion, Distrito Capital, Paraguay",
@@ -149,12 +152,15 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Comma-separated subset of city names (default: all project cities).",
     )
     parser.add_argument(
-        "--country", default="paraguay", help="Country part of the file names (default: paraguay)."
+        "--country",
+        default=None,
+        help="Country part of the file names, e.g. 'brazil'. Defaults to each "
+        "city's 'country' in config/cities/<city>.yaml.",
     )
     parser.add_argument("--sleep", type=float, default=1.2, help="Seconds between Nominatim calls.")
     args = parser.parse_args(argv)
 
-    from pipeline.config import load_global
+    from pipeline.config import load_config, load_global
 
     cfg = load_global()
     out_dir = args.out or os.path.join(cfg.ai_dua_mapping_dir, "data", "raw", "aoi")
@@ -176,7 +182,8 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     failures: List[str] = []
     for city in city_names:
-        country_norm = normalize(args.country)
+        country = args.country or load_config(city).country
+        country_norm = normalize(country)
         file_name = f"{normalize(city)}_{country_norm}_aoi.geojson"
         target = os.path.join(out_dir, file_name)
 

@@ -8,7 +8,8 @@ For the automated end-to-end test we use a fictional city name
 (``testcity`` / ``testcity-ref``) but this city still needs valid Sentinel-2,
 building footprints, building density and GHSL data ... so we generate it by
 calling the very same framework download functions on a small *real* area
-(a few square kilometres; default: a square near Coronel Oviedo, Paraguay).
+(a few square kilometres; the default example area is a square near Coronel
+Oviedo, Paraguay — pick your own with ``--bbox``).
 The outputs are written exactly where ``preprocessing/prepare_data.py``
 expects them, under ``ai-dua-mapping/data/raw/``.
 
@@ -42,7 +43,7 @@ from typing import List, Optional
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FRAMEWORK_DIR = REPO_ROOT / "ai-dua-mapping"
 
-# Default: ~6.6 x 6.6 km square centred near Coronel Oviedo, Paraguay.
+# Default example area: ~6.6 x 6.6 km square centred near Coronel Oviedo, Paraguay.
 DEFAULT_BBOX = "-56.4700,-25.4700,-56.4100,-25.4100"
 YEAR = 2025
 
