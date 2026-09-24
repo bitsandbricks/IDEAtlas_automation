@@ -1,11 +1,15 @@
 """Unit tests for tools.fetch_city_aois (no network; uses a fake Session)."""
+import os
+
 import pytest
 
+from pipeline.config import load_config
 from tools.fetch_city_aois import (
     MIN_AREA_KM2,
     _area_km2,
     _bbox_geometry,
     fetch_aoi_geometry,
+    normalize,
 )
 
 
@@ -106,3 +110,17 @@ def test_bbox_geometry_rejects_malformed():
     assert _bbox_geometry({"boundingbox": ["1", "2", "3"]}) is None
     assert _bbox_geometry({"boundingbox": ["1", "0", "2", "3"]}) is None  # south > north
     assert _bbox_geometry({"boundingbox": ["-1", "1", "-2", "2"]}) == _rect_polygon(-2, -1, 2, 1)
+
+
+@pytest.mark.parametrize("city", ["asuncion", "encarnacion", "ciudad-del-este"])
+def test_output_name_matches_framework_aoi_path(city):
+    """The tool saves <city>_<country>_aoi.geojson — the file the framework reads.
+
+    pipeline.config derives ``aoi_path`` from ``city_normalized = "<city>_<country>"``
+    (config.py:141) and both the framework (prepare_data.py) and the pipeline
+    (sdg_stats_wrapper.py) require that exact file name.
+    """
+    cfg = load_config(city)
+    tool_name = f"{normalize(city)}_{normalize(cfg.country)}_aoi.geojson"
+    assert os.path.basename(cfg.aoi_path) == tool_name
+    assert normalize(cfg.country) in tool_name

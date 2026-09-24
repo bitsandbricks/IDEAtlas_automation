@@ -85,11 +85,6 @@ def _plausible(geometry: dict) -> bool:
     return MIN_AREA_KM2 <= area <= MAX_AREA_KM2
 
 
-def _plausible(geometry: dict) -> bool:
-    area = _area_km2(geometry)
-    return MIN_AREA_KM2 <= area <= MAX_AREA_KM2
-
-
 def _nominatim_query(session: requests.Session, query: str, sleep: float) -> List[dict]:
     time.sleep(sleep)
     response = session.get(
