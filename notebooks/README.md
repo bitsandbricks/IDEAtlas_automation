@@ -63,11 +63,16 @@ The config file, AOI placement and naming are handled automatically.
   `REPO_URL`, e.g. `https://<token>@github.com/<user>/IDEAtlas_automation`
   (do not leave the notebook with a live token).
 - **Restart after the conda install:** installing Miniconda restarts the
-  Colab runtime once. Just run *all* cells again — every step is skip-safe,
-  so only the remaining work runs.
-- **Session limits:** free Colab disconnects after ~90 min idle / ~12 h total.
-  If your run is interrupted, re-run `Run all` — completed steps are skipped
-  and results are never lost (they start being copied to Drive at the end).
+  Colab runtime once, but the clone, Miniconda and the `ideatlas` env survive
+  a *kernel* restart — so just **resume from Step 6** (Step 5 only prepares
+  inputs when `CITY = "custom"` and is not re-run; re-running the whole
+  notebook is harmless but repeats the TensorFlow sanity check and the Drive
+  copy).
+- **Session limits:** free Colab disconnects after ~90 min idle / ~12 h total,
+  releasing the VM and wiping `/content`. If your run is interrupted there,
+  re-run the notebook from the top — everything rebuilds (AOIs already fetched
+  are skipped, `make city` resumes from its markers) and results already
+  copied to Drive are safe.
 - **Slow / no GPU:** always export the network, then choose the T4 GPU at the
   top. The notebook prints the detected GPU in Step 2 and a TensorFlow GPU
   check after the environment is built.
