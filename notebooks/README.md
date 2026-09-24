@@ -64,10 +64,9 @@ The config file, AOI placement and naming are handled automatically.
   (do not leave the notebook with a live token).
 - **Restart after the conda install:** installing Miniconda restarts the
   Colab runtime once, but the clone, Miniconda and the `ideatlas` env survive
-  a *kernel* restart — so just **resume from Step 6** (Step 5 only prepares
-  inputs when `CITY = "custom"` and is not re-run; re-running the whole
-  notebook is harmless but repeats the TensorFlow sanity check and the Drive
-  copy).
+  a *kernel* restart — re-run the next cell (Step 4) and then continue from
+  Step 6. Only a full **Factory reset runtime** wipes `/content`; re-run the
+  notebook from the top in that case.
 - **Session limits:** free Colab disconnects after ~90 min idle / ~12 h total,
   releasing the VM and wiping `/content`. If your run is interrupted there,
   re-run the notebook from the top — everything rebuilds (AOIs already fetched
