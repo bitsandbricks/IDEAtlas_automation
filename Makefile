@@ -23,6 +23,8 @@ YEAR ?= 2025
 TASK ?= classify
 WEIGHTS ?=
 PARALLEL ?= 0
+SOURCE ?= nominatim
+FUA_DATA ?=
 
 # Python interpreter from the active (ideatlas) conda environment.
 PYTHON ?= python
@@ -58,8 +60,11 @@ help:
 	@echo "  make setup        Create the 'ideatlas' conda environment and install"
 	@echo "                    the thin-layer dependencies (run once)."
 	@echo ""
-	@echo "  make aois         Fetch city boundaries (AOIs) for the cities in"
-	@echo "                    config/cities/ from OpenStreetMap/Nominatim."
+	@echo "  make aois [SOURCE=fua] [FUA_DATA=<gpkg>]  Fetch city boundaries (AOIs) for the cities in"
+	@echo "                    config/cities/. Defaults to OpenStreetMap/Nominatim;"
+	@echo "                    SOURCE=fua reads the GHS Functional Urban Areas"
+	@echo "                    GeoPackage instead (ai-dua-mapping/data/raw/ghsl/fua/"
+	@echo "                    or the FUA_DATA path)."
 	@echo ""
 	@echo "  make prob CITY=...  Re-run inference and persist the continuous"
 	@echo "                    informal/DUA probability raster (float32) next to"
@@ -86,7 +91,8 @@ help:
 	@echo "  make test        Run the offline unit tests."
 	@echo "  make e2e         Run the end-to-end test on the testcity fixtures."
 	@echo ""
-	@echo "Variables: CITY, YEAR (2025), TASK (classify), WEIGHTS, PARALLEL (0)."
+	@echo "Variables: CITY, YEAR (2025), TASK (classify), WEIGHTS, PARALLEL (0),"
+	@echo "           SOURCE (nominatim), FUA_DATA (epoch 2015 GeoPackage)."
 
 # --- One city, end to end ------------------------------------------------------
 
@@ -145,7 +151,7 @@ setup:
 
 aois:
 	@mkdir -p ai-dua-mapping/data/raw/aoi
-	@$(PYTHON) tools/fetch_city_aois.py --out ai-dua-mapping/data/raw/aoi
+	@$(PYTHON) tools/fetch_city_aois.py --out ai-dua-mapping/data/raw/aoi --source $(SOURCE) $(if $(FUA_DATA),--fua-data $(FUA_DATA),)
 
 # Re-run inference but persist the continuous informal/DUA probability raster
 # next to the classification map (ai-dua-mapping/output), for evaluation.

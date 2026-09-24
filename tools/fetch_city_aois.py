@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch city boundaries (AOIs) for the project cities from OSM.
+"""Fetch city boundaries (AOIs) for the project cities.
 
 Why this tool exists
 --------------------
@@ -11,11 +11,26 @@ formed queries and place them where the framework expects them
 (``ai-dua-mapping/data/raw/aoi/<city>_<country>_aoi.geojson``). When a file
 already exists there, the framework skips its own geocoding call.
 
-Nominatim rate limits apply: this tool sleeps between requests and uses a
-custom User-Agent. Run it inside the ``ideatlas`` conda environment:
+Two boundary sources are supported (``--source``):
+
+- ``nominatim`` (default): OpenStreetMap via Nominatim, using the curated
+  ``CITY_QUERIES`` queries. Nominatim rate limits apply: the tool sleeps
+  between requests and uses a custom User-Agent.
+- ``fua``: the OECD/GHSL *Functional Urban Area* polygon from the global
+  GHS-FUA GeoPackage (``GHS_FUA_UCDB2015_GLOBE_R2019A_54009_1K_V1_0.gpkg``,
+  doi 10.2905/JRC.DEC76Y8, https://data.europa.eu/89h/347f0337-f2da-4592-87b3-e25975ec2c95).
+  Cities match the dataset's ``eFUA_name`` attribute via ``CITY_FUA_NAMES``
+  (case- and accent-insensitive). The polygon is reprojected from World
+  Mollweide (EPSG:54009) to WGS84 so the output stays in the same CRS as the
+  Nominatim path.
+
+Run it inside the ``ideatlas`` conda environment:
 
     conda activate ideatlas
-    make aois
+    make aois                        # Nominatim (default)
+    make aois SOURCE=fua             # GHS-FUA (expects the gpkg under
+                                     # ai-dua-mapping/data/raw/ghsl/fua/)
+    make aois SOURCE=fua FUA_DATA=/path/to/GHS_FUA_UCDB2015_GLOBE_R2019A_54009_1K_V1_0.gpkg
 
 Then verify the downloaded boundaries in a GIS viewer before running the
 full pipeline.
@@ -27,6 +42,7 @@ import json
 import os
 import sys
 import time
+import unicodedata
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -39,6 +55,10 @@ NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 USER_AGENT = "ideatlas-automation/0.1 (reproducible SDG 11.1.1 mapping)"
 MIN_AREA_KM2 = 1.0
 MAX_AREA_KM2 = 10000.0
+# Functional Urban Areas are whole commuting/metro regions, far larger than a
+# municipality, so they get a much higher area ceiling.
+FUA_MAX_AREA_KM2 = 50000.0
+DEFAULT_FUA_GEOJSON = "GHS_FUA_UCDB2015_GLOBE_R2019A_54009_1K_V1_0.gpkg"
 
 # Curated queries: try them in order until a plausible polygon is returned.
 # The entries below are the example cities from the first implementation
@@ -60,6 +80,16 @@ CITY_QUERIES: Dict[str, List[str]] = {
     ],
 }
 
+# GHS-FUA names: values are the ``eFUA_name`` attribute values (the dataset's
+# own English name for each Functional Urban Area) to match for the city. The
+# first name that matches any FUA feature wins; matching is case- and
+# accent-insensitive. Only consulted when --source fua.
+CITY_FUA_NAMES: Dict[str, List[str]] = {
+    "asuncion": ["Asunción"],
+    "encarnacion": ["Encarnación"],
+    "ciudad-del-este": ["Ciudad del Este"],
+}
+
 
 def _area_km2(geometry: dict) -> Optional[float]:
     """Approximate polygon area in km2 from lon/lat coordinates.
@@ -78,11 +108,15 @@ def _area_km2(geometry: dict) -> Optional[float]:
     return geom.area * (111.32 ** 2)  # rough degrees^2 -> km^2
 
 
-def _plausible(geometry: dict) -> bool:
+def _plausible(
+    geometry: dict,
+    min_area: float = MIN_AREA_KM2,
+    max_area: float = MAX_AREA_KM2,
+) -> bool:
     area = _area_km2(geometry)
     if area is None:
         return True  # unknown area; do not reject on that alone
-    return MIN_AREA_KM2 <= area <= MAX_AREA_KM2
+    return min_area <= area <= max_area
 
 
 def _nominatim_query(session: requests.Session, query: str, sleep: float) -> List[dict]:
@@ -184,6 +218,100 @@ def fetch_aoi_geometry(
     return None
 
 
+def _norm_name(name: str) -> str:
+    """Fold a place name for fuzzy matching: lowercase, strip accents, collapse spaces.
+
+    ``"Asunción"``, ``"asuncion"`` and ``"  ASUNCIÓN  "`` all fold to
+    ``"asuncion"`` so GHS-FUA ``eFUA_name`` values can be matched without
+    worrying about the dataset's casing or diacritics.
+    """
+    decomposed = unicodedata.normalize("NFKD", name)
+    without_accents = "".join(c for c in decomposed if not unicodedata.combining(c))
+    return " ".join(without_accents.strip().lower().split())
+
+
+def _first_fua_match(records: List[dict], names: List[str]) -> Optional[dict]:
+    """Return the first record whose ``eFUA_name`` matches one of ``names``.
+
+    Matching is case- and accent-insensitive. ``names`` are tried in priority
+    order against every record. Returns ``None`` when nothing matches.
+    """
+    for name in names:
+        norm = _norm_name(name)
+        for record in records:
+            if _norm_name(str(record.get("eFUA_name", ""))) == norm:
+                print(f"    matched eFUA_name={record.get('eFUA_name')!r} (alias {name!r})")
+                return record
+    print(f"    no GHS-FUA matched the given names ({', '.join(names)})")
+    return None
+
+
+def _reproject_to_wgs84(geometry: dict) -> Optional[dict]:
+    """Reproject a GeoJSON geometry from World Mollweide (EPSG:54009) to WGS84.
+
+    Returns ``None`` when rasterio is unavailable.
+    """
+    try:
+        from rasterio.warp import transform_geom
+    except ImportError:
+        print("    rasterio not available; cannot reproject from EPSG:54009")
+        return None
+    return transform_geom("EPSG:54009", "EPSG:4326", geometry)
+
+
+def fetch_fua_geometry(
+    fua_data: str,
+    names: List[str],
+    max_area: float = FUA_MAX_AREA_KM2,
+) -> Optional[dict]:
+    """Return the WGS84 GeoJSON geometry of the GHS-FUA matching ``names``.
+
+    Reads the global GHS-FUA GeoPackage (EPSG:54009, World Mollweide),
+    selects the feature whose ``eFUA_name`` matches one of ``names``, and
+    reprojects it to EPSG:4326 so the output keeps the same WGS84 contract as
+    the Nominatim path. Requires fiona and rasterio (both present in the
+    ``ideatlas`` environment).
+    """
+    if not os.path.exists(fua_data):
+        print(f"    GHS-FUA data not found: {fua_data}")
+        return None
+
+    try:
+        import fiona
+    except ImportError:
+        print("    fiona not available; cannot read the GeoPackage")
+        return None
+
+    print(f"    scanning GHS-FUA GeoPackage: {fua_data}")
+    records: List[dict] = []
+    geometries: Dict[int, dict] = {}
+    try:
+        with fiona.open(fua_data) as src:
+            for index, feature in enumerate(src):
+                records.append(feature.get("properties") or {})
+                geometries[index] = feature.get("geometry")
+    except Exception as exc:
+        print(f"    could not read GHS-FUA data: {exc}")
+        return None
+
+    record = _first_fua_match(records, names)
+    if record is None:
+        return None
+    index = records.index(record)
+    geometry = geometries.get(index)
+    if geometry is None:
+        print("    matched feature has no geometry")
+        return None
+
+    geometry = _reproject_to_wgs84(geometry)
+    if geometry is None:
+        return None
+    if not _plausible(geometry, max_area=max_area):
+        print(f"    rejected (implausible area): {record['eFUA_name']}")
+        return None
+    return geometry
+
+
 def build_aoi_feature(geometry: dict) -> dict:
     """Wrap a bare geometry into a FeatureCollection (safest for geopandas)."""
     return {
@@ -216,7 +344,24 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Country part of the file names, e.g. 'brazil'. Defaults to each "
         "city's 'country' in config/cities/<city>.yaml.",
     )
-    parser.add_argument("--sleep", type=float, default=1.2, help="Seconds between Nominatim calls.")
+    parser.add_argument(
+        "--source",
+        choices=("nominatim", "fua"),
+        default="nominatim",
+        help="Boundary source: 'nominatim' (OSM, default) or 'fua' (GHS "
+        "Functional Urban Areas, requires the GHS-FUA GeoPackage).",
+    )
+    parser.add_argument(
+        "--fua-data",
+        default=None,
+        help="Path to the GHS-FUA GeoPackage "
+        f"({DEFAULT_FUA_GEOJSON}). Required when --source fua; defaults to "
+        "the conventional location under ai-dua-mapping/data/raw/ghsl/fua/.",
+    )
+    parser.add_argument(
+        "--sleep", type=float, default=1.2,
+        help="Seconds between Nominatim calls (only used with --source nominatim).",
+    )
     args = parser.parse_args(argv)
 
     from pipeline.config import load_config, load_global
@@ -224,20 +369,39 @@ def main(argv: Optional[List[str]] = None) -> int:
     cfg = load_global()
     out_dir = args.out or os.path.join(cfg.ai_dua_mapping_dir, "data", "raw", "aoi")
 
+    is_fua = args.source == "fua"
+    if is_fua:
+        fua_data = args.fua_data or os.path.join(
+            cfg.ai_dua_mapping_dir, "data", "raw", "ghsl", "fua", DEFAULT_FUA_GEOJSON
+        )
+        if not os.path.exists(fua_data):
+            print(
+                f"GHS-FUA data not found at {fua_data}. Download the GHS-FUA "
+                f"R2019A GeoPackage (doi 10.2905/JRC.DEC76Y8) and pass it with "
+                f"--fua-data <path>, or drop it at the path above.",
+                file=sys.stderr,
+            )
+            return 2
+    else:
+        fua_data = None
+
+    known_cities = CITY_FUA_NAMES if is_fua else CITY_QUERIES
+
     if args.cities:
         city_names = [c.strip().lower() for c in args.cities.split(",") if c.strip()]
     else:
-        city_names = list(CITY_QUERIES.keys())
+        city_names = list(known_cities.keys())
 
-    for unknown in set(city_names) - set(CITY_QUERIES):
-        print(f"WARNING: no curated queries defined for {unknown!r}; skipping.")
-    city_names = [c for c in city_names if c in CITY_QUERIES]
+    for unknown in set(city_names) - set(known_cities):
+        what = "GHS-FUA names" if is_fua else "curated queries"
+        print(f"WARNING: no {what} defined for {unknown!r}; skipping.")
+    city_names = [c for c in city_names if c in known_cities]
     if not city_names:
         print("No city names to process.", file=sys.stderr)
         return 1
 
     os.makedirs(out_dir, exist_ok=True)
-    session = requests.Session()
+    session = requests.Session() if not is_fua else None
 
     failures: List[str] = []
     for city in city_names:
@@ -251,7 +415,10 @@ def main(argv: Optional[List[str]] = None) -> int:
             continue
 
         print(f"\n=== {city} ===")
-        geometry = fetch_aoi_geometry(session, CITY_QUERIES[city], sleep=args.sleep)
+        if is_fua:
+            geometry = fetch_fua_geometry(fua_data, CITY_FUA_NAMES[city])
+        else:
+            geometry = fetch_aoi_geometry(session, CITY_QUERIES[city], sleep=args.sleep)
         if geometry is None:
             msg = (
                 f"Could not fetch a plausible boundary for {city}. "

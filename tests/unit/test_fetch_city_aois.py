@@ -5,10 +5,15 @@ import pytest
 
 from pipeline.config import load_config
 from tools.fetch_city_aois import (
+    FUA_MAX_AREA_KM2,
     MIN_AREA_KM2,
     _area_km2,
     _bbox_geometry,
+    _first_fua_match,
+    _norm_name,
+    _plausible,
     fetch_aoi_geometry,
+    main,
     normalize,
 )
 
@@ -124,3 +129,43 @@ def test_output_name_matches_framework_aoi_path(city):
     tool_name = f"{normalize(city)}_{normalize(cfg.country)}_aoi.geojson"
     assert os.path.basename(cfg.aoi_path) == tool_name
     assert normalize(cfg.country) in tool_name
+
+
+def test_norm_name_folds_case_accents_and_whitespace():
+    assert _norm_name("Asunción") == "asuncion"
+    assert _norm_name("CIUDAD DEL ESTE") == "ciudad del este"
+    assert _norm_name("  Ciudad\tdel  Este  ") == "ciudad del este"
+    assert _norm_name("Encarnación") == "encarnacion"
+
+
+def test_first_fua_match_is_accent_and_case_insensitive():
+    records = [
+        {"eFUA_name": "Asunción", "eFUA_ID": 1},
+        {"eFUA_name": "Encarnación", "eFUA_ID": 2},
+        {"unknown": "x"},  # missing eFUA_name never matches
+    ]
+    assert _first_fua_match(records, ["encarnacion"]) == {"eFUA_name": "Encarnación", "eFUA_ID": 2}
+    assert _first_fua_match(records, ["ASUNCION"]) == {"eFUA_name": "Asunción", "eFUA_ID": 1}
+    assert _first_fua_match(records, ["somewhere"]) is None
+
+
+def test_plausible_area_bounds_are_parameterized():
+    big = _rect_polygon(-1, -1, 0.5, 0.5)  # ~28 000 km²
+    assert not _plausible(big)  # default nominatim cap is 10 000 km²
+    assert _plausible(big, max_area=FUA_MAX_AREA_KM2)
+    small = _rect_polygon(-57.640, -25.280, -57.639, -25.279)
+    assert not _plausible(small, max_area=FUA_MAX_AREA_KM2)
+
+
+def test_main_default_source_is_nominatim(capsys):
+    """Without --source, cities not in CITY_QUERIES are skipped, not fetched."""
+    assert main(["--cities", "atlantis"]) == 1
+    out = capsys.readouterr().out
+    assert "no curated queries defined for 'atlantis'" in out
+
+
+def test_main_fua_without_data_is_a_clear_error(capsys):
+    """--source fua without an existing GeoPackage exits 2 before any download."""
+    assert main(["--source", "fua", "--cities", "asuncion", "--fua-data", "/nonexistent/fua.gpkg"]) == 2
+    err = capsys.readouterr().err
+    assert "GHS-FUA data not found" in err

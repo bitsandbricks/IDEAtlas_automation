@@ -9,7 +9,7 @@ one **optional** file:
 | What | Where | Purpose |
 |---|---|---|
 | `config/cities/<city>.yaml` | required | Who/where: `country`, `year` |
-| `CITY_QUERIES` entry in `tools/fetch_city_aois.py` | recommended | How to find the city boundary (Nominatim queries) |
+| `CITY_QUERIES` or `CITY_FUA_NAMES` entry in `tools/fetch_city_aois.py` | recommended | How to find the city boundary (Nominatim queries, or a GHS-FUA name) |
 | `ai-dua-mapping/data/raw/reference_data/<city>_<country>_reference_<year>_v<n>.geojson` | only for `finetune`/`train` | Labeled "deprived urban area" polygons for training (version suffix required — see [§5](#5-fine-tuning-or-training-a-local-model)) |
 
 Everything else (file names, downloads, the report) is derived automatically
@@ -55,7 +55,7 @@ outputs paths). Per-city keys win. You can also override `country` / `year` /
 
 ## 2. Make the boundary resolvable
 
-Two options; pick one.
+Three options; pick one.
 
 ### Option A (recommended): add curated queries
 
@@ -114,18 +114,61 @@ The AOI is what determines the download window (Sentinel-2 tile, building
 footprints, GHSL pixels), so size/placement matters — a sliver or a
 mis-projected file produces worthless data.
 
+### Option C: GHS Functional Urban Area (GHS-FUA)
+
+Use the OECD/GHSL *Functional Urban Area* polygon — the commuting/metro
+region around a city — instead of a Nominatim administrative boundary. This
+is the right choice when the "city of interest" is really a metropolitan
+area and not a municipality.
+
+1. **Download the global GeoPackage once** (the automation layer caches
+   nothing itself):
+   - Product: `GHS-FUA R2019A` (doi `10.2905/JRC.DEC76Y8`) — dataset page
+     https://data.europa.eu/89h/347f0337-f2da-4592-87b3-e25975ec2c95
+   - Unzip the `GHS_FUA_UCDB2015_GLOBE_R2019A_54009_1K_V1_0.gpkg` and place it
+     at `ai-dua-mapping/data/raw/ghsl/fua/` (this path is the default when
+     `FUA_DATA` is not given).
+2. **Add the matching `eFUA_name`** (the dataset's English name for the FUA,
+   with accents) to the `CITY_FUA_NAMES` dict in `tools/fetch_city_aois.py`,
+   keyed by your city. Matching is case- and accent-insensitive, so
+   `"Asuncion"` finds `"Asunción"`:
+   ```python
+   CITY_FUA_NAMES: Dict[str, List[str]] = {
+       # ... existing example cities ...
+       "rio-de-janeiro": ["Rio de Janeiro"],
+   }
+   ```
+   The tool reprojects the polygon from World Mollweide (EPSG:54009) to WGS84
+   automatically (no QGIS step needed).
+3. **Fetch:**
+   ```bash
+   make aois SOURCE=fua
+   make aois SOURCE=fua FUA_DATA=/path/to/GHS_FUA_UCDB2015_GLOBE_R2019A_54009_1K_V1_0.gpkg
+   ```
+
+Notes:
+
+- The dataset is a **2015** delineation at 1 km resolution; the AOI only sets
+  the mapping window, so the vintage mismatch with the (e.g. 2025) imagery is
+  irrelevant in practice.
+- FUAs are large (up to tens of thousands of km²), so the area-plausibility
+  cap for this source is relaxed to 50,000 km².
+- Boundary fetched by `eFUA_name`; provide a name the dataset actually uses.
+  If nothing matches you get `no GHS-FUA matched the given names ...`.
+
 ---
 
 ## 3. Fetch and verify the boundary
 
 ```bash
 conda activate ideatlas      # (or install first: make setup)
-make aois
+make aois                                    # Nominatim (Option A)
+make aois SOURCE=fua [FUA_DATA=<gpkg>]       # GHS-FUA (Option C)
 ```
 
-`make aois` fetches AOIs for **every** city that has curated queries and
-skips files that already exist. For your new city this produces
-`ai-dua-mapping/data/raw/aoi/<city>_<country>_aoi.geojson`.
+`make aois` fetches AOIs for **every** city that has curated queries (or
+GHS-FUA names) and skips files that already exist. For your new city this
+produces `ai-dua-mapping/data/raw/aoi/<city>_<country>_aoi.geojson`.
 
 **Open it in a GIS viewer (QGIS) before running the pipeline** — a wrong
 boundary means gigabytes of wasted downloads. To re-download:
@@ -334,7 +377,8 @@ find them.
 
 - [ ] `config/cities/<city>.yaml` exists and has a `country`.
 - [ ] City key is unique repo-wide; names make sense for `<city>_<country>`.
-- [ ] Either queries added to `CITY_QUERIES` **or** a hand-written AOI file is
+- [ ] Either queries added to `CITY_QUERIES` (Nominatim), a GHS-FUA name in
+      `CITY_FUA_NAMES` + `SOURCE=fua` (GHS-FUA), or a hand-written AOI file is
       in place.
 - [ ] `make aois` ran and the boundary opens correctly in a GIS viewer.
 - [ ] (finetune/train) reference polygons named
