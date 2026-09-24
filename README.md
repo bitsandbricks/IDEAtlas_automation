@@ -54,6 +54,12 @@ make all-cities
 make report
 ```
 
+> **GPU:** TensorFlow uses the GPU automatically. Because conda no longer
+> exports the environment's `lib/` to `LD_LIBRARY_PATH`, the Makefile injects it
+> so `cudatoolkit`/`cudnn` are found; inference otherwise silently falls back to
+> CPU. (If the runtime lost GPU when *directly* invoking `python`, check for a
+> stale `/usr/local/cuda-*` in `LD_LIBRARY_PATH` in your shell rc files.)
+
 Your results land in `outputs/`:
 
 ```

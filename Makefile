@@ -27,6 +27,15 @@ PARALLEL ?= 0
 # Python interpreter from the active (ideatlas) conda environment.
 PYTHON ?= python
 
+# Conda environments no longer export $CONDA_PREFIX/lib to LD_LIBRARY_PATH by
+# default, yet the cudatoolkit/cudnn packages live there and TensorFlow needs
+# them at load time to use the GPU (otherwise it silently falls back to CPU).
+# Inject the interpreter's own lib dir on every target, so GPU inference works
+# from any shell/activation. A stale entry pointing at a removed /usr/local/cuda
+# (leftover in .bashrc) is harmless once this env lib comes first.
+PYTHON_LIBS := $(shell $(PYTHON) -c 'import sys,os; print(os.path.join(sys.prefix,"lib"))' 2>/dev/null)
+PYTHON := env LD_LIBRARY_PATH="$(PYTHON_LIBS):$$LD_LIBRARY_PATH" $(PYTHON)
+
 # --- File locations used by the pipeline steps --------------------------------
 # Task decision (which task actually runs after any fallback):
 TASK_MODE_FILE = data/processed/$(CITY)_$(YEAR)_task_mode.json
