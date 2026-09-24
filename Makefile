@@ -52,6 +52,10 @@ help:
 	@echo "  make aois         Fetch city boundaries (AOIs) for the cities in"
 	@echo "                    config/cities/ from OpenStreetMap/Nominatim."
 	@echo ""
+	@echo "  make prob CITY=...  Re-run inference and persist the continuous"
+	@echo "                    informal/DUA probability raster (float32) next to"
+	@echo "                    the classification map, for evaluation."
+	@echo ""
 	@echo "  make fixtures     Generate the synthetic test-city (testcity) input data"
 	@echo "                    using the real framework download functions."
 	@echo ""
@@ -64,7 +68,7 @@ help:
 	@echo "          3. compute the SDG 11.1.1 statistics (sdg_stats.json)."
 	@echo ""
 	@echo "  make all-cities [YEAR=...] [TASK=...] [PARALLEL=1]"
-	@echo "        Runs 'city' for Asuncion, Encarnacion and Ciudad del Este."
+	@echo "        Runs 'city' for every country:city pair defined in the Makefile."
 	@echo "        PARALLEL=1 processes them at the same time (default: serial)."
 	@echo ""
 	@echo "  make report      Consolidate all sdg_stats.json into ideatlas_report.md"
@@ -120,7 +124,7 @@ report:
 
 # --- Environment and development tooling ---------------------------------------
 
-.PHONY: setup aois fixtures test e2e
+.PHONY: setup aois prob fixtures test e2e
 
 setup:
 	@echo "Creating/updating conda environment 'ideatlas' from ai-dua-mapping/environment.yaml ..."
@@ -133,6 +137,11 @@ setup:
 aois:
 	@mkdir -p ai-dua-mapping/data/raw/aoi
 	@$(PYTHON) tools/fetch_city_aois.py --out ai-dua-mapping/data/raw/aoi
+
+# Re-run inference but persist the continuous informal/DUA probability raster
+# next to the classification map (ai-dua-mapping/output), for evaluation.
+prob:
+	$(PYTHON) tools/make_informal_prob.py --city $(CITY) --year $(YEAR) $(if $(WEIGHTS),--weights $(WEIGHTS),)
 
 fixtures:
 	@$(PYTHON) tools/fetch_test_fixtures.py
