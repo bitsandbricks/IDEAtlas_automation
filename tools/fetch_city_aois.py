@@ -246,17 +246,20 @@ def _first_fua_match(records: List[dict], names: List[str]) -> Optional[dict]:
     return None
 
 
-def _reproject_to_wgs84(geometry: dict) -> Optional[dict]:
-    """Reproject a GeoJSON geometry from World Mollweide (EPSG:54009) to WGS84.
+def _reproject_to_wgs84(geometry: dict, src_crs="ESRI:54009") -> Optional[dict]:
+    """Reproject a GeoJSON geometry from World Mollweide (ESRI:54009) to WGS84.
 
-    Returns ``None`` when rasterio is unavailable.
+    World Mollweide is an ESRI code, not an official EPSG one, and some
+    GDAL/PROJ builds reject ``EPSG:54009``; ``ESRI:54009`` (or the CRS read
+    from the GeoPackage itself) resolves everywhere. Returns ``None`` when
+    rasterio is unavailable.
     """
     try:
         from rasterio.warp import transform_geom
     except ImportError:
-        print("    rasterio not available; cannot reproject from EPSG:54009")
+        print("    rasterio not available; cannot reproject from ESRI:54009")
         return None
-    return transform_geom("EPSG:54009", "EPSG:4326", geometry)
+    return transform_geom(src_crs, "EPSG:4326", geometry)
 
 
 def fetch_fua_geometry(
@@ -285,8 +288,10 @@ def fetch_fua_geometry(
     print(f"    scanning GHS-FUA GeoPackage: {fua_data}")
     records: List[dict] = []
     geometries: Dict[int, dict] = {}
+    src_crs = "ESRI:54009"
     try:
         with fiona.open(fua_data) as src:
+            src_crs = src.crs
             for index, feature in enumerate(src):
                 records.append(feature.get("properties") or {})
                 geometries[index] = feature.get("geometry")
@@ -303,7 +308,7 @@ def fetch_fua_geometry(
         print("    matched feature has no geometry")
         return None
 
-    geometry = _reproject_to_wgs84(geometry)
+    geometry = _reproject_to_wgs84(geometry, src_crs)
     if geometry is None:
         return None
     if not _plausible(geometry, max_area=max_area):
