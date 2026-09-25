@@ -171,6 +171,21 @@ def write_json_atomic(path: str, payload: dict) -> str:
     return path
 
 
+def resolve_out_path(out: str, start_cwd: Optional[str] = None) -> str:
+    """Return ``out`` as an absolute path.
+
+    A relative ``--out`` must resolve against the directory the process was
+    started in, not the working directory at write time: ``import_framework``
+    changes the process CWD with ``os.chdir``, so a relative path resolved
+    later would silently land inside the framework clone instead of the
+    caller's output directory (e.g. ``outputs/`` next to the Makefile).
+    """
+    if os.path.isabs(out):
+        return out
+    base = os.path.abspath(start_cwd) if start_cwd else os.path.abspath(os.getcwd())
+    return os.path.join(base, out)
+
+
 def compute_summary(cfg: SimpleNamespace, sdg, raster: str, pop_raster: str):
     """Polygonize the classified classes and return the framework summary DF."""
     gdf = sdg.polygonize_builtup_classes(raster, (FORMAL_CLASS, INFORMAL_CLASS))
@@ -199,6 +214,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--task-mode", default=None, help="Path to task_mode.json (optional).")
     parser.add_argument("--out", required=True, help="Path to write the sdg_stats.json document.")
     args = parser.parse_args(argv)
+    args.out = resolve_out_path(args.out)
 
     cfg = load_config(args.city, country=args.country, year=args.year)
     logger = get_logger("sdg_stats_wrapper", city=cfg.city, year=cfg.year, log_dir=cfg.log_dir)

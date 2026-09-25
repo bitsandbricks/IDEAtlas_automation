@@ -1,5 +1,6 @@
 """Unit tests for the pure helpers of pipeline.sdg_stats_wrapper."""
 import json
+import os
 
 import pytest
 
@@ -8,6 +9,7 @@ from pipeline.sdg_stats_wrapper import (
     build_output_json,
     ghsl_pop_pattern,
     locate_classified_raster,
+    resolve_out_path,
     summary_to_json,
     write_json_atomic,
 )
@@ -95,3 +97,18 @@ def test_write_json_atomic(tmp_path):
     write_json_atomic(str(target), {"totals": {"x": 1}})
     with open(target, encoding="utf-8") as fh:
         assert json.load(fh) == {"totals": {"x": 1}}
+
+
+def test_resolve_out_path_keeps_absolute(tmp_path):
+    target = tmp_path / "sdg_stats.json"
+    assert resolve_out_path(str(target), "/some/start/cwd") == str(target)
+
+
+def test_resolve_out_path_joins_relative_to_start_cwd(tmp_path):
+    result = resolve_out_path("outputs/encarnacion_2025_sdg_stats.json", str(tmp_path))
+    assert result == os.path.join(str(tmp_path), "outputs", "encarnacion_2025_sdg_stats.json")
+
+
+def test_resolve_out_path_defaults_to_current_cwd(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    assert resolve_out_path("stats.json") == os.path.join(str(tmp_path), "stats.json")
